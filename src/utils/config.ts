@@ -132,7 +132,7 @@ export function loadProfile(config: ConfigFile, profileName: string): LearnConfi
   };
 }
 
-export function getApiKey(config: ConfigFile, envFile?: string): string {
+export function getOpenAIApiKey(config: ConfigFile, envFile?: string): string {
   // Check custom env file first
   if (envFile) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
