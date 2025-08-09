@@ -73,7 +73,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 <Box flexDirection="row" alignItems="center">
                   <Text color="blue" bold>👤 You:</Text>
                 </Box>
-                <Box paddingLeft={2} marginTop={0.5}>
+                <Box paddingLeft={1} marginTop={0.5}>
                   <Text wrap="wrap">{message.content}</Text>
                 </Box>
               </Box>
@@ -92,8 +92,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           return null;
         })}
 
-        {/* Current streaming response */}
-        {isStreaming && currentResponse && (
+        {/* Current response preview (non-streaming flow: keep hidden) */}
+        {false && isStreaming && currentResponse && (
           <ResponseDisplay 
             content={currentResponse} 
             action="chat"

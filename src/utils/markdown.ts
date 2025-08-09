@@ -21,8 +21,10 @@ export class MarkdownFormatter {
         this.formatTable(header, rows)
       )
 
-      // 4. Math expressions (LaTeX) - bulletproof
+      // 4. Math expressions (LaTeX) - support $$...$$, \[...\], and \(...\)
       .replace(/\$\$\s*\n?([\s\S]*?)\n?\s*\$\$/g, (_, math) => this.formatMathBlock(math.trim()))
+      .replace(/\\\[\s*\n?([\s\S]*?)\n?\s*\\\]/g, (_, math) => this.formatMathBlock(math.trim()))
+      .replace(/\\\((.+?)\\\)/g, (_, math) => this.formatInlineMath(math.trim()))
       .replace(/\$([^$\n\r]+?)\$/g, (_, math) => this.formatInlineMath(math.trim()))
 
       // 5. Headers (all levels with proper hierarchy)
@@ -458,4 +460,321 @@ export class MarkdownFormatter {
       })
       .join('\n');
   }
+
+  // Method to format markdown for Ink components (returns structured data instead of ANSI codes)
+  static formatForInk(text: string): InkMarkdownElement[] {
+    // Reset footnotes for each format call
+    this.footnotes.clear();
+
+    const elements: InkMarkdownElement[] = [];
+    const lines = text.split('\n');
+
+    let inCodeBlock = false;
+    let codeLanguage = '';
+    let codeContent: string[] = [];
+    let inMathBlock = false;
+    let mathContent: string[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i] || '';
+
+      // Handle code blocks
+      if (line.trim().startsWith('```')) {
+        if (inCodeBlock) {
+          // End code block
+          elements.push({
+            type: 'codeblock',
+            content: codeContent.join('\n'),
+            language: codeLanguage,
+          });
+          inCodeBlock = false;
+          codeLanguage = '';
+          codeContent = [];
+        } else {
+          // Start code block
+          inCodeBlock = true;
+          codeLanguage = line.trim().substring(3).trim();
+        }
+        continue;
+      }
+
+      if (inCodeBlock) {
+        codeContent.push(line);
+        continue;
+      }
+
+      // Handle math blocks \[ ... \]
+      if (line.trim() === '\\[') {
+        inMathBlock = true;
+        mathContent = [];
+        continue;
+      }
+      if (line.trim() === '\\]') {
+        elements.push({
+          type: 'mathblock',
+          content: this.beautifyBlockMath(mathContent.join('\n')),
+        });
+        inMathBlock = false;
+        mathContent = [];
+        continue;
+      }
+
+      // Handle inline math blocks like \[ content \] on single line
+      const inlineMathMatch = line.match(/\\\[(.*?)\\\]/);
+      if (inlineMathMatch && inlineMathMatch[1]) {
+        elements.push({
+          type: 'mathblock',
+          content: this.beautifyBlockMath(inlineMathMatch[1].trim()),
+        });
+        continue;
+      }
+      if (inMathBlock) {
+        mathContent.push(line);
+        continue;
+      }
+
+      // Handle $$ math blocks
+      if (line.trim() === '$$') {
+        if (inMathBlock) {
+          elements.push({
+            type: 'mathblock',
+            content: this.beautifyBlockMath(mathContent.join('\n')),
+          });
+          inMathBlock = false;
+          mathContent = [];
+        } else {
+          inMathBlock = true;
+          mathContent = [];
+        }
+        continue;
+      }
+
+      // Headers
+      if (line.startsWith('# ')) {
+        elements.push({
+          type: 'header',
+          level: 1,
+          content: line.substring(2).trim(),
+        });
+      } else if (line.startsWith('## ')) {
+        elements.push({
+          type: 'header',
+          level: 2,
+          content: line.substring(3).trim(),
+        });
+      } else if (line.startsWith('### ')) {
+        elements.push({
+          type: 'header',
+          level: 3,
+          content: line.substring(4).trim(),
+        });
+      } else if (line.startsWith('#### ')) {
+        elements.push({
+          type: 'header',
+          level: 4,
+          content: line.substring(5).trim(),
+        });
+      } else if (line.startsWith('##### ')) {
+        elements.push({
+          type: 'header',
+          level: 5,
+          content: line.substring(6).trim(),
+        });
+      } else if (line.startsWith('###### ')) {
+        elements.push({
+          type: 'header',
+          level: 6,
+          content: line.substring(7).trim(),
+        });
+      }
+      // Horizontal rules
+      else if (line.match(/^[-*_]{3,}\s*$/)) {
+        elements.push({
+          type: 'hr',
+          content: '',
+        });
+      }
+      // Lists
+      else if (line.match(/^(\s*)[-*+]\s+(.+)$/)) {
+        const match = line.match(/^(\s*)[-*+]\s+(.+)$/);
+        if (match && match[1] !== undefined && match[2]) {
+          elements.push({
+            type: 'list',
+            ordered: false,
+            indent: match[1].length,
+            content: this.parseInlineMarkdown(match[2]),
+          });
+        }
+      }
+      // Numbered lists
+      else if (line.match(/^(\s*)(\d+)\.\s+(.+)$/)) {
+        const match = line.match(/^(\s*)(\d+)\.\s+(.+)$/);
+        if (match && match[1] !== undefined && match[2] && match[3]) {
+          elements.push({
+            type: 'list',
+            ordered: true,
+            number: parseInt(match[2]),
+            indent: match[1].length,
+            content: this.parseInlineMarkdown(match[3]),
+          });
+        }
+      }
+      // Blockquotes
+      else if (line.startsWith('> ')) {
+        elements.push({
+          type: 'blockquote',
+          content: this.parseInlineMarkdown(line.substring(2)),
+        });
+      }
+      // Empty lines
+      else if (line.trim() === '') {
+        elements.push({
+          type: 'empty',
+          content: '',
+        });
+      }
+      // Regular text
+      else {
+        elements.push({
+          type: 'text',
+          content: this.parseInlineMarkdown(line),
+        });
+      }
+    }
+
+    return elements;
+  }
+
+  private static parseInlineMarkdown(text: string): InlineElement[] {
+    const elements: InlineElement[] = [];
+    let remaining = text;
+
+    // Handle inline math first \( ... \)
+    remaining = remaining.replace(/\\\((.+?)\\\)/g, (_, math) => {
+      const placeholder = `__MATH_${elements.length}__`;
+      elements.push({ type: 'math', content: this.beautifyInlineMath(math.trim()) });
+      return placeholder;
+    });
+
+    // Handle inline code `code`
+    remaining = remaining.replace(/`(.+?)`/g, (_, code) => {
+      const placeholder = `__CODE_${elements.length}__`;
+      elements.push({ type: 'code', content: code });
+      return placeholder;
+    });
+
+    // Handle bold **text**
+    remaining = remaining.replace(/\*\*(.+?)\*\*/g, (_, text) => {
+      const placeholder = `__BOLD_${elements.length}__`;
+      elements.push({ type: 'bold', content: text });
+      return placeholder;
+    });
+
+    // Handle italic *text*
+    remaining = remaining.replace(/\*(.+?)\*/g, (_, text) => {
+      const placeholder = `__ITALIC_${elements.length}__`;
+      elements.push({ type: 'italic', content: text });
+      return placeholder;
+    });
+
+    // Handle strikethrough ~~text~~
+    remaining = remaining.replace(/~~(.+?)~~/g, (_, text) => {
+      const placeholder = `__STRIKE_${elements.length}__`;
+      elements.push({ type: 'strikethrough', content: text });
+      return placeholder;
+    });
+
+    // Handle links [text](url)
+    remaining = remaining.replace(/\[(.+?)\]\((.+?)\)/g, (_, text, url) => {
+      const placeholder = `__LINK_${elements.length}__`;
+      elements.push({ type: 'link', content: text, url });
+      return placeholder;
+    });
+
+    // Split by placeholders and add text elements
+    const parts = remaining.split(/(__(?:MATH|CODE|BOLD|ITALIC|STRIKE|LINK)_\d+__)/);
+    const result: InlineElement[] = [];
+
+    parts.forEach((part) => {
+      const match = part.match(/__(?:MATH|CODE|BOLD|ITALIC|STRIKE|LINK)_(\d+)__/);
+      if (match && match[1]) {
+        const element = elements[parseInt(match[1])];
+        if (element) result.push(element);
+      } else if (part.trim()) {
+        result.push({ type: 'text', content: part });
+      }
+    });
+
+    return result;
+  }
+
+  private static beautifyInlineMath(math: string): string {
+    return this.beautifyBlockMath(math);
+  }
+
+  private static beautifyBlockMath(math: string): string {
+    return (
+      math
+        // Greek letters
+        .replace(/\\alpha/g, 'α')
+        .replace(/\\beta/g, 'β')
+        .replace(/\\gamma/g, 'γ')
+        .replace(/\\delta/g, 'δ')
+        .replace(/\\epsilon/g, 'ε')
+        .replace(/\\lambda/g, 'λ')
+        .replace(/\\mu/g, 'μ')
+        .replace(/\\pi/g, 'π')
+        .replace(/\\sigma/g, 'σ')
+        .replace(/\\tau/g, 'τ')
+        .replace(/\\phi/g, 'φ')
+        .replace(/\\chi/g, 'χ')
+        .replace(/\\omega/g, 'ω')
+        .replace(/\\Omega/g, 'Ω')
+        .replace(/\\Delta/g, 'Δ')
+        .replace(/\\Lambda/g, 'Λ')
+        .replace(/\\kappa/g, 'κ')
+        .replace(/\\nu/g, 'ν')
+        // Math symbols
+        .replace(/\\infty/g, '∞')
+        .replace(/\\sum/g, '∑')
+        .replace(/\\prod/g, '∏')
+        .replace(/\\int/g, '∫')
+        .replace(/\\partial/g, '∂')
+        .replace(/\\nabla/g, '∇')
+        .replace(/\\pm/g, '±')
+        .replace(/\\mp/g, '∓')
+        .replace(/\\cdot/g, '·')
+        .replace(/\\times/g, '×')
+        .replace(/\\div/g, '÷')
+        .replace(/\\neq/g, '≠')
+        .replace(/\\leq/g, '≤')
+        .replace(/\\geq/g, '≥')
+        .replace(/\\approx/g, '≈')
+        .replace(/\\hbar/g, 'ℏ')
+        // Functions and structures
+        .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1/$2)')
+        .replace(/\\sqrt\{([^}]+)\}/g, '√($1)')
+        .replace(/\\text\{([^}]+)\}/g, '$1')
+        // Remove remaining backslashes from simple cases
+        .replace(/\\([a-zA-Z])/g, '$1')
+    );
+  }
+}
+
+// Types for Ink-compatible markdown
+export interface InkMarkdownElement {
+  type: 'header' | 'text' | 'list' | 'codeblock' | 'mathblock' | 'blockquote' | 'hr' | 'empty';
+  content: string | InlineElement[];
+  level?: number; // for headers
+  language?: string; // for code blocks
+  ordered?: boolean; // for lists
+  number?: number; // for numbered lists
+  indent?: number; // for lists
+  url?: string; // for links
+}
+
+export interface InlineElement {
+  type: 'text' | 'bold' | 'italic' | 'code' | 'math' | 'strikethrough' | 'link';
+  content: string;
+  url?: string; // for links
 }

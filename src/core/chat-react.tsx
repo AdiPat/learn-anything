@@ -42,18 +42,14 @@ export class ReactChatSession {
         setMessages(updatedMessages);
         this.messages = updatedMessages;
 
+        // Show thinking spinner (non-streaming)
         setIsLoading(true);
+        setIsStreaming(false);
         setCurrentResponse('');
-        setIsStreaming(true);
 
         try {
-          let fullResponse = '';
-          
-          // Stream the response
-          for await (const chunk of this.aiService.streamChatCompletion(this.messages)) {
-            fullResponse += chunk;
-            setCurrentResponse(fullResponse);
-          }
+          // Non-streaming single completion for clean markdown render
+          const fullResponse = await this.aiService.chatCompletion(this.messages);
 
           // Add assistant response to messages
           const assistantMessage: ChatMessage = {
@@ -64,7 +60,7 @@ export class ReactChatSession {
           const finalMessages = [...updatedMessages, assistantMessage];
           setMessages(finalMessages);
           this.messages = finalMessages;
-          
+          // Stop spinner
           setIsStreaming(false);
           setCurrentResponse('');
         } catch (error) {

@@ -1,5 +1,5 @@
 import { AIService } from '@/core/ai.js';
-import { EnhancedChatSession } from '@/core/enhanced-chat.js';
+import { ReactChatSession } from '@/core/chat-react.js';
 import { OutputManager } from '@/core/output.js';
 import { UI } from '@/utils/ui.js';
 import { loadConfig, getOpenAIApiKey, loadProfile } from '@/utils/config.js';
@@ -147,8 +147,9 @@ export class LeanCore {
   private async startChatSession(): Promise<void> {
     if (!this.aiService) return;
 
-    this.ui.showWelcome();
-    const chatSession = new EnhancedChatSession(this.aiService, this.ui);
+    // Ensure no existing UI app interferes with chat input
+    this.ui.unmount();
+    const chatSession = new ReactChatSession(this.aiService);
     await chatSession.start();
   }
 }

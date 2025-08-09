@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { ActionType } from '@/types/index.js';
-import { MarkdownRenderer } from './markdown-renderer.js';
+import { MarkdownRenderer as ProductionMarkdownRenderer } from './ui/markdown-renderer.js';
 
 interface ResponseDisplayProps {
   content: string;
@@ -46,7 +46,7 @@ export const ResponseDisplay: React.FC<ResponseDisplayProps> = ({
         </Box>
       </Box>
       <Box flexDirection="column" paddingLeft={2}>
-        <MarkdownRenderer content={content} />
+        <ProductionMarkdownRenderer content={content} />
       </Box>
     </Box>
   );

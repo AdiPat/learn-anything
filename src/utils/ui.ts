@@ -145,7 +145,7 @@ export class UI {
 
   public startSpinner(_text: string = 'Loading...'): void {
     this.render({});
-    this.updateState?.({ isLoading: true });
+    this.updateState?.({ isLoading: true, isStreaming: false });
   }
 
   public updateSpinner(_text: string): void {
