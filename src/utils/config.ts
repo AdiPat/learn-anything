@@ -4,14 +4,15 @@ import os from 'os';
 import { ConfigFile, LearnConfig } from '@/types/index.js';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
+import dotenv from 'dotenv';
 
 const CONFIG_DIR = path.join(os.homedir(), '.lean');
-const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
+const DEFAULT_CONFIG_FILE_PATH = path.join(CONFIG_DIR, 'config.json');
 
 export const DEFAULT_CONFIG: ConfigFile = {
   model: 'gpt-4o',
   temperature: 0.7,
-  maxTokens: 4000,
+  maxTokens: 4096,
   outputDir: path.join(os.homedir(), '.lean', 'outputs'),
 };
 
@@ -24,25 +25,46 @@ export async function ensureConfigDir(): Promise<void> {
 }
 
 export async function loadConfig(customConfigPath?: string): Promise<ConfigFile> {
-  const configPath = customConfigPath || CONFIG_FILE;
+  let configToLoad = customConfigPath;
 
-  try {
-    const configContent = await fs.readFile(configPath, 'utf-8');
-    const config = JSON.parse(configContent) as ConfigFile;
-    return { ...DEFAULT_CONFIG, ...config };
-  } catch {
-    // If config doesn't exist, create it with defaults
+  if (!customConfigPath) {
+    console.log(chalk.yellow.bold('\n🔍 Custom config path not provided. Using default config:'));
+    console.log(chalk.yellow.bold(`${DEFAULT_CONFIG_FILE_PATH}\n`));
+    configToLoad = DEFAULT_CONFIG_FILE_PATH;
+  }
+
+  if (!configToLoad) {
     if (!customConfigPath) {
       await saveConfig(DEFAULT_CONFIG);
     }
     return DEFAULT_CONFIG;
   }
+
+  const configContent = await fs.readFile(configToLoad, 'utf-8');
+  const config = JSON.parse(configContent) as ConfigFile;
+  // If config does not have all the fields, use the default config.
+  const consolidatedConfig = { ...DEFAULT_CONFIG, ...config };
+  return consolidatedConfig;
 }
 
 export async function saveConfig(config: ConfigFile, customConfigPath?: string): Promise<void> {
   await ensureConfigDir();
-  const configPath = customConfigPath || CONFIG_FILE;
-  await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+
+  let configPathToSave = customConfigPath;
+
+  if (!customConfigPath) {
+    console.log(
+      chalk.yellow.bold('\n🔍 Save config: Custom config path not provided. Using default config.')
+    );
+    console.log(chalk.yellow.bold(`${DEFAULT_CONFIG_FILE_PATH}\n`));
+    configPathToSave = DEFAULT_CONFIG_FILE_PATH;
+  }
+
+  if (!configPathToSave) {
+    throw new Error('Config path is required. Please provide a custom config path.');
+  }
+
+  await fs.writeFile(configPathToSave, JSON.stringify(config, null, 2));
 }
 
 export async function setupInteractiveConfig(): Promise<ConfigFile> {
@@ -136,7 +158,7 @@ export function getOpenAIApiKey(config: ConfigFile, envFile?: string): string {
   // Check custom env file first
   if (envFile) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-    const envConfig = require('dotenv').config({ path: envFile });
+    const envConfig = dotenv.config({ path: envFile });
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return
     if (envConfig.parsed?.OPENAI_API_KEY) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return
@@ -155,6 +177,6 @@ export function getOpenAIApiKey(config: ConfigFile, envFile?: string): string {
   }
 
   throw new Error(
-    'OpenAI API key not found. Please set OPENAI_API_KEY environment variable or run: lean --setup-config'
+    'OpenAI API key not found. Please set OPENAI_API_KEY environment variable or run: lean --setup-config.'
   );
 }

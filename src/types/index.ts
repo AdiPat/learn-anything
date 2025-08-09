@@ -16,6 +16,12 @@ export interface ActionOptions {
   creativity?: number;
   interactive?: boolean;
   output?: string;
+  // Global action shortcuts
+  ask?: string;
+  analyze?: string;
+  explain?: string;
+  teach?: string;
+  chat?: string;
 }
 
 export type ActionType = 'analyze' | 'ask' | 'explain' | 'teach' | 'chat';

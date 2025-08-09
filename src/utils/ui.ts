@@ -1,198 +1,275 @@
-import React, { useEffect, useState } from 'react';
-import { render, Box } from 'ink';
-import {
-  Welcome,
-  ActionHeader,
-  LoadingSpinner,
-  ResponseDisplay,
-  ErrorDisplay,
-  SuccessDisplay,
-  InfoDisplay,
-} from '@/components/index.js';
+import chalk from 'chalk';
+import boxen from 'boxen';
+import gradient from 'gradient-string';
+import ora, { Ora } from 'ora';
+import wrapAnsi from 'wrap-ansi';
+
+import terminalLink from 'terminal-link';
 import { ActionType } from '@/types/index.js';
 
-type Mode = 'welcome' | 'action' | 'error' | 'success' | 'info';
-
-interface UIState {
-  mode: Mode;
-  action?: ActionType;
-  query?: string;
-  isLoading: boolean;
-  isStreaming: boolean;
-  response?: string;
-  error?: string;
-  success?: string;
-  info?: { title: string; content: string };
-}
-
-type Updater = (state: Partial<UIState>) => void;
-
-interface AppProps {
-  initial: Partial<UIState>;
-  onUpdateReady: (fn: Updater) => void;
-}
-
-const h = React.createElement;
-
-const App: React.FC<AppProps> = ({ initial, onUpdateReady }) => {
-  const [state, setState] = useState<UIState>({
-    mode: 'welcome',
-    isLoading: false,
-    isStreaming: false,
-    response: '',
-    ...initial,
-  });
-
-  useEffect(() => {
-    onUpdateReady((s) => setState((prev) => ({ ...prev, ...s })));
-  }, [onUpdateReady]);
-
-  const children: Array<React.ReactNode> = [];
-
-  if (state.mode === 'welcome') {
-    children.push(h(Welcome as any, { version: '1.0.0' }));
-  }
-
-  if (state.mode === 'action' && state.action && state.query) {
-    children.push(
-      h(
-        Box as any,
-        { flexDirection: 'column' },
-        h(Welcome as any, { version: '1.0.0' }),
-        h(ActionHeader as any, { action: state.action, query: state.query }),
-        state.isLoading ? h(LoadingSpinner as any, { text: 'Generating response...' }) : null,
-        state.response
-          ? h(ResponseDisplay as any, {
-              content: state.response,
-              action: state.action,
-              isStreaming: state.isStreaming,
-            })
-          : null
-      )
-    );
-  }
-
-  if (state.mode === 'error' && state.error) {
-    children.push(
-      h(
-        Box as any,
-        { flexDirection: 'column' },
-        h(Welcome as any, { version: '1.0.0' }),
-        h(ErrorDisplay as any, {
-          message: state.error,
-          suggestion: 'Please check your configuration and try again.',
-        })
-      )
-    );
-  }
-
-  if (state.mode === 'success' && state.success) {
-    children.push(
-      h(
-        Box as any,
-        { flexDirection: 'column' },
-        h(Welcome as any, { version: '1.0.0' }),
-        h(SuccessDisplay as any, { message: state.success })
-      )
-    );
-  }
-
-  if (state.mode === 'info' && state.info) {
-    children.push(
-      h(
-        Box as any,
-        { flexDirection: 'column' },
-        h(Welcome as any, { version: '1.0.0' }),
-        h(InfoDisplay as any, { title: state.info.title, content: state.info.content })
-      )
-    );
-  }
-
-  return h(Box as any, { flexDirection: 'column' }, ...children);
-};
-
 export class UI {
-  private appInstance: any = null;
-  private updateState: Updater | null = null;
+  private spinner: Ora | null = null;
+  private isStreaming: boolean = false;
 
-  private render(initial: Partial<UIState>): void {
-    if (this.appInstance && this.updateState) {
-      this.updateState(initial);
-      return;
-    }
-
-    const onUpdateReady = (fn: Updater) => {
-      this.updateState = fn;
-    };
-
-    this.appInstance = render(h(App, { initial, onUpdateReady }));
+  constructor() {
+    // Initialize any UI state if needed
   }
 
   public showWelcome(): void {
-    this.render({ mode: 'welcome' });
+    const title = gradient.cristal('🧠 LEAN - Learn Anything');
+    const subtitle = chalk.gray('Powered by AI • Learn anything, anytime');
+    const version = chalk.gray('v1.0.0');
+
+    const welcomeContent = `${title}\n${subtitle}\n${version}`;
+
+    const welcomeBox = boxen(welcomeContent, {
+      padding: 1,
+      margin: 1,
+      borderStyle: 'round',
+      borderColor: 'cyan',
+      backgroundColor: '#0a0a0a',
+      textAlignment: 'center',
+    });
+
+    console.log(welcomeBox);
   }
 
   public showActionHeader(action: ActionType, query: string): void {
-    this.render({
-      mode: 'action',
-      action,
-      query,
-      isLoading: false,
-      isStreaming: false,
-      response: '',
+    const actionConfig = {
+      analyze: { emoji: '🔍', color: 'magenta', label: 'ANALYZE' },
+      ask: { emoji: '💭', color: 'blue', label: 'ASK' },
+      explain: { emoji: '📚', color: 'green', label: 'EXPLAIN' },
+      teach: { emoji: '🎓', color: 'yellow', label: 'TEACH' },
+      chat: { emoji: '💬', color: 'cyan', label: 'CHAT' },
+    } as const;
+
+    const config = actionConfig[action] || actionConfig.ask;
+    const colorFn = chalk[config.color as keyof typeof chalk] as any;
+
+    console.log();
+    console.log(
+      `${config.emoji} ${colorFn.bold(config.label)} ${chalk.gray('•')} ${chalk.white(query)}`
+    );
+    console.log(chalk.gray('─'.repeat(Math.min(process.stdout.columns - 4, 80))));
+    console.log();
+  }
+
+  public startSpinner(text: string = 'Loading...'): void {
+    if (this.spinner) {
+      this.spinner.stop();
+    }
+    this.spinner = ora({
+      text: chalk.cyan(text),
+      color: 'cyan',
+      spinner: 'dots12',
+    }).start();
+  }
+
+  public updateSpinner(text: string): void {
+    if (this.spinner) {
+      this.spinner.text = chalk.cyan(text);
+    }
+  }
+
+  public stopSpinner(message?: string): void {
+    if (this.spinner) {
+      if (message) {
+        this.spinner.succeed(chalk.green(message));
+      } else {
+        this.spinner.stop();
+      }
+      this.spinner = null;
+    }
+  }
+
+  public failSpinner(message?: string): void {
+    if (this.spinner) {
+      if (message) {
+        this.spinner.fail(chalk.red(message));
+      } else {
+        this.spinner.fail(chalk.red('Operation failed'));
+      }
+      this.spinner = null;
+    }
+  }
+
+  public showResponse(content: string, _action: ActionType): void {
+    console.log();
+
+    // Format the markdown content for terminal display
+    const formattedContent = this.formatMarkdown(content);
+
+    const responseBox = boxen(formattedContent, {
+      padding: 1,
+      margin: 1,
+      borderStyle: 'single',
+      borderColor: 'blue',
+      backgroundColor: '#001122',
+      width: Math.min(process.stdout.columns - 4, 100),
     });
-  }
 
-  public startSpinner(_text: string = 'Loading...'): void {
-    this.render({});
-    this.updateState?.({ isLoading: true, isStreaming: false });
-  }
-
-  public updateSpinner(_text: string): void {
-    // reserved for future use
-  }
-
-  public stopSpinner(_message?: string): void {
-    this.updateState?.({ isLoading: false });
-  }
-
-  public failSpinner(_message?: string): void {
-    this.updateState?.({ isLoading: false });
-  }
-
-  public showResponse(content: string, action: ActionType): void {
-    this.updateState?.({ response: content, action, mode: 'action' });
+    console.log(responseBox);
+    console.log();
   }
 
   public startStreaming(): void {
-    this.updateState?.({ isStreaming: true, isLoading: false });
+    this.isStreaming = true;
+    console.log();
+    console.log(chalk.cyan('🔄 Streaming response...'));
+    console.log();
   }
 
   public showStreamingResponse(content: string): void {
-    this.updateState?.({ response: content, isStreaming: true });
+    if (!this.isStreaming) return;
+
+    // Clear the previous streaming output and show updated content
+    process.stdout.write('\x1b[2J\x1b[0f'); // Clear screen
+
+    const formattedContent = this.formatMarkdown(content);
+    console.log(chalk.blue('📝 Response:'));
+    console.log();
+    console.log(formattedContent);
+    console.log();
+    console.log(chalk.gray('─'.repeat(Math.min(process.stdout.columns - 4, 60))));
+    console.log(chalk.yellow('⏳ Still generating...'));
   }
 
   public stopStreaming(): void {
-    this.updateState?.({ isStreaming: false });
+    this.isStreaming = false;
   }
 
   public showError(message: string): void {
-    this.render({ mode: 'error', error: message });
+    const errorBox = boxen(
+      `${chalk.red.bold('❌ Error')}\n\n${chalk.red(message)}\n\n${chalk.gray('Please check your configuration and try again.')}`,
+      {
+        padding: 1,
+        margin: 1,
+        borderStyle: 'double',
+        borderColor: 'red',
+        backgroundColor: '#220000',
+      }
+    );
+
+    console.error(errorBox);
   }
 
   public showSuccess(message: string): void {
-    this.render({ mode: 'success', success: message });
+    const successBox = boxen(`${chalk.green.bold('✅ Success')}\n\n${chalk.green(message)}`, {
+      padding: 1,
+      margin: 1,
+      borderStyle: 'single',
+      borderColor: 'green',
+      backgroundColor: '#002200',
+    });
+
+    console.log(successBox);
   }
 
   public showInfo(title: string, content: string): void {
-    this.render({ mode: 'info', info: { title, content } });
+    const infoBox = boxen(`${chalk.blue.bold(`ℹ️  ${title}`)}\n\n${chalk.white(content)}`, {
+      padding: 1,
+      margin: 1,
+      borderStyle: 'single',
+      borderColor: 'blue',
+      backgroundColor: '#000022',
+    });
+
+    console.log(infoBox);
   }
 
   public unmount(): void {
-    if (this.appInstance) {
-      this.appInstance.unmount();
-      this.appInstance = null;
-      this.updateState = null;
+    if (this.spinner) {
+      this.spinner.stop();
+      this.spinner = null;
     }
+    this.isStreaming = false;
+  }
+
+  private formatMarkdown(content: string): string {
+    const lines = content.split('\n');
+    const formattedLines: string[] = [];
+
+    let inCodeBlock = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i] || '';
+
+      // Code blocks
+      if (line.startsWith('```')) {
+        inCodeBlock = !inCodeBlock;
+        formattedLines.push(chalk.gray(line));
+        continue;
+      }
+
+      if (inCodeBlock) {
+        formattedLines.push(chalk.green(line));
+        continue;
+      }
+
+      // Headers
+      if (line.startsWith('# ')) {
+        formattedLines.push(chalk.green.bold.underline(line.substring(2)));
+        continue;
+      }
+
+      if (line.startsWith('## ')) {
+        formattedLines.push(chalk.cyan.bold(line.substring(3)));
+        continue;
+      }
+
+      if (line.startsWith('### ')) {
+        formattedLines.push(chalk.blue.bold(line.substring(4)));
+        continue;
+      }
+
+      // Lists
+      if (line.startsWith('- ') || line.startsWith('* ')) {
+        formattedLines.push(`  ${chalk.yellow('•')} ${line.substring(2)}`);
+        continue;
+      }
+
+      // Numbered lists
+      if (/^\d+\.\s/.test(line)) {
+        const match = line.match(/^(\d+)\.\s(.+)$/);
+        if (match) {
+          formattedLines.push(`  ${chalk.cyan.bold(match[1] + '.')} ${match[2]}`);
+          continue;
+        }
+      }
+
+      // Process inline formatting
+      let processedLine = line;
+
+      // Bold text
+      processedLine = processedLine.replace(/\*\*(.+?)\*\*/g, (_, text) => chalk.bold(text));
+
+      // Italic text
+      processedLine = processedLine.replace(/\*(.+?)\*/g, (_, text) => chalk.italic(text));
+
+      // Code (backticks)
+      processedLine = processedLine.replace(/`(.+?)`/g, (_, text) =>
+        chalk.bgGray.black(` ${text} `)
+      );
+
+      // Links (simple pattern)
+      processedLine = processedLine.replace(/\[(.+?)\]\((.+?)\)/g, (_, text, url) => {
+        return terminalLink(chalk.blue.underline(text), url, {
+          fallback: () => `${chalk.blue.underline(text)} (${chalk.gray(url)})`,
+        });
+      });
+
+      // Wrap long lines
+      if (processedLine.length > 0) {
+        const wrapped = wrapAnsi(processedLine, Math.min(process.stdout.columns - 8, 92), {
+          trim: false,
+          hard: true,
+        });
+        formattedLines.push(wrapped);
+      } else {
+        formattedLines.push('');
+      }
+    }
+
+    return formattedLines.join('\n');
   }
 }
