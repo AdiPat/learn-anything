@@ -1,16 +1,16 @@
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import { AIService } from './ai.js';
-import { UIManager } from '@/utils/ui.js';
+import { UI } from '@/utils/ui.js';
 import { ChatMessage } from '@/types/index.js';
 
 export class ChatSession {
   private aiService: AIService;
-  private ui: UIManager;
+  private ui: UI;
   private messages: ChatMessage[] = [];
   private isRunning: boolean = false;
 
-  constructor(aiService: AIService, ui: UIManager) {
+  constructor(aiService: AIService, ui: UI) {
     this.aiService = aiService;
     this.ui = ui;
 

@@ -1,142 +1,198 @@
-import chalk from 'chalk';
-import ora, { Ora } from 'ora';
-import boxen from 'boxen';
-import gradient from 'gradient-string';
+import React, { useEffect, useState } from 'react';
+import { render, Box } from 'ink';
+import {
+  Welcome,
+  ActionHeader,
+  LoadingSpinner,
+  ResponseDisplay,
+  ErrorDisplay,
+  SuccessDisplay,
+  InfoDisplay,
+} from '@/components/index.js';
+import { ActionType } from '@/types/index.js';
 
-export class UIManager {
-  private spinner: Ora | null = null;
+type Mode = 'welcome' | 'action' | 'error' | 'success' | 'info';
+
+interface UIState {
+  mode: Mode;
+  action?: ActionType;
+  query?: string;
+  isLoading: boolean;
+  isStreaming: boolean;
+  response?: string;
+  error?: string;
+  success?: string;
+  info?: { title: string; content: string };
+}
+
+type Updater = (state: Partial<UIState>) => void;
+
+interface AppProps {
+  initial: Partial<UIState>;
+  onUpdateReady: (fn: Updater) => void;
+}
+
+const h = React.createElement;
+
+const App: React.FC<AppProps> = ({ initial, onUpdateReady }) => {
+  const [state, setState] = useState<UIState>({
+    mode: 'welcome',
+    isLoading: false,
+    isStreaming: false,
+    response: '',
+    ...initial,
+  });
+
+  useEffect(() => {
+    onUpdateReady((s) => setState((prev) => ({ ...prev, ...s })));
+  }, [onUpdateReady]);
+
+  const children: Array<React.ReactNode> = [];
+
+  if (state.mode === 'welcome') {
+    children.push(h(Welcome as any, { version: '1.0.0' }));
+  }
+
+  if (state.mode === 'action' && state.action && state.query) {
+    children.push(
+      h(
+        Box as any,
+        { flexDirection: 'column' },
+        h(Welcome as any, { version: '1.0.0' }),
+        h(ActionHeader as any, { action: state.action, query: state.query }),
+        state.isLoading ? h(LoadingSpinner as any, { text: 'Generating response...' }) : null,
+        state.response
+          ? h(ResponseDisplay as any, {
+              content: state.response,
+              action: state.action,
+              isStreaming: state.isStreaming,
+            })
+          : null
+      )
+    );
+  }
+
+  if (state.mode === 'error' && state.error) {
+    children.push(
+      h(
+        Box as any,
+        { flexDirection: 'column' },
+        h(Welcome as any, { version: '1.0.0' }),
+        h(ErrorDisplay as any, {
+          message: state.error,
+          suggestion: 'Please check your configuration and try again.',
+        })
+      )
+    );
+  }
+
+  if (state.mode === 'success' && state.success) {
+    children.push(
+      h(
+        Box as any,
+        { flexDirection: 'column' },
+        h(Welcome as any, { version: '1.0.0' }),
+        h(SuccessDisplay as any, { message: state.success })
+      )
+    );
+  }
+
+  if (state.mode === 'info' && state.info) {
+    children.push(
+      h(
+        Box as any,
+        { flexDirection: 'column' },
+        h(Welcome as any, { version: '1.0.0' }),
+        h(InfoDisplay as any, { title: state.info.title, content: state.info.content })
+      )
+    );
+  }
+
+  return h(Box as any, { flexDirection: 'column' }, ...children);
+};
+
+export class UI {
+  private appInstance: any = null;
+  private updateState: Updater | null = null;
+
+  private render(initial: Partial<UIState>): void {
+    if (this.appInstance && this.updateState) {
+      this.updateState(initial);
+      return;
+    }
+
+    const onUpdateReady = (fn: Updater) => {
+      this.updateState = fn;
+    };
+
+    this.appInstance = render(h(App, { initial, onUpdateReady }));
+  }
 
   public showWelcome(): void {
-    const title = gradient.cristal('LEAN - Learn Anything');
-    const subtitle = chalk.gray('Powered by AI • Learn anything, anytime');
-
-    console.log(
-      boxen(`${title}\n${subtitle}`, {
-        padding: 1,
-        margin: 1,
-        borderStyle: 'round',
-        borderColor: 'cyan',
-        backgroundColor: '#1a1a1a',
-      })
-    );
+    this.render({ mode: 'welcome' });
   }
 
-  public startSpinner(text: string): void {
-    this.spinner = ora({
-      text: chalk.cyan(text),
-      spinner: 'dots12',
-      color: 'cyan',
-    }).start();
+  public showActionHeader(action: ActionType, query: string): void {
+    this.render({
+      mode: 'action',
+      action,
+      query,
+      isLoading: false,
+      isStreaming: false,
+      response: '',
+    });
   }
 
-  public updateSpinner(text: string): void {
-    if (this.spinner) {
-      this.spinner.text = chalk.cyan(text);
-    }
+  public startSpinner(_text: string = 'Loading...'): void {
+    this.render({});
+    this.updateState?.({ isLoading: true });
   }
 
-  public stopSpinner(message?: string): void {
-    if (this.spinner) {
-      if (message) {
-        this.spinner.succeed(chalk.green(message));
-      } else {
-        this.spinner.stop();
-      }
-      this.spinner = null;
-    }
+  public updateSpinner(_text: string): void {
+    // reserved for future use
   }
 
-  public failSpinner(message?: string): void {
-    if (this.spinner) {
-      this.spinner.fail(chalk.red(message || 'Operation failed'));
-      this.spinner = null;
-    }
+  public stopSpinner(_message?: string): void {
+    this.updateState?.({ isLoading: false });
   }
 
-  public showError(error: string): void {
-    console.log(
-      '\n' +
-        boxen(chalk.red.bold('❌ Error\n\n') + chalk.white(error), {
-          padding: 1,
-          margin: 1,
-          borderStyle: 'round',
-          borderColor: 'red',
-        })
-    );
+  public failSpinner(_message?: string): void {
+    this.updateState?.({ isLoading: false });
+  }
+
+  public showResponse(content: string, action: ActionType): void {
+    this.updateState?.({ response: content, action, mode: 'action' });
+  }
+
+  public startStreaming(): void {
+    this.updateState?.({ isStreaming: true, isLoading: false });
+  }
+
+  public showStreamingResponse(content: string): void {
+    this.updateState?.({ response: content, isStreaming: true });
+  }
+
+  public stopStreaming(): void {
+    this.updateState?.({ isStreaming: false });
+  }
+
+  public showError(message: string): void {
+    this.render({ mode: 'error', error: message });
   }
 
   public showSuccess(message: string): void {
-    console.log(
-      '\n' +
-        boxen(chalk.green.bold('✅ Success\n\n') + chalk.white(message), {
-          padding: 1,
-          margin: 1,
-          borderStyle: 'round',
-          borderColor: 'green',
-        })
-    );
+    this.render({ mode: 'success', success: message });
   }
 
   public showInfo(title: string, content: string): void {
-    console.log(
-      '\n' +
-        boxen(chalk.blue.bold(`ℹ️  ${title}\n\n`) + chalk.white(content), {
-          padding: 1,
-          margin: 1,
-          borderStyle: 'round',
-          borderColor: 'blue',
-        })
-    );
+    this.render({ mode: 'info', info: { title, content } });
   }
 
-  public formatAction(action: string): string {
-    const actionColors = {
-      analyze: chalk.magenta.bold,
-      ask: chalk.blue.bold,
-      explain: chalk.green.bold,
-      teach: chalk.yellow.bold,
-      chat: chalk.cyan.bold,
-    };
-
-    const formatter = actionColors[action as keyof typeof actionColors] || chalk.white.bold;
-    return formatter(action.toUpperCase());
-  }
-
-  public formatResponse(content: string, _action: string): string {
-    const lines = content.split('\n');
-    const formatted = lines.map((line) => {
-      if (line.startsWith('#')) {
-        return chalk.bold.cyan(line);
-      } else if (line.startsWith('##')) {
-        return chalk.bold.blue(line);
-      } else if (line.startsWith('###')) {
-        return chalk.bold.green(line);
-      } else if (line.startsWith('-') || line.startsWith('*')) {
-        return chalk.yellow(line);
-      } else if (line.includes('```')) {
-        return chalk.gray(line);
-      }
-      return line;
-    });
-
-    return formatted.join('\n');
-  }
-
-  public showTypingAnimation(text: string, delay: number = 30): Promise<void> {
-    return new Promise((resolve) => {
-      let i = 0;
-      const timer = setInterval(() => {
-        const char = text[i];
-        if (char !== undefined) {
-          process.stdout.write(char);
-        }
-        i++;
-        if (i >= text.length) {
-          clearInterval(timer);
-          console.log(); // New line
-          resolve();
-        }
-      }, delay);
-    });
+  public unmount(): void {
+    if (this.appInstance) {
+      this.appInstance.unmount();
+      this.appInstance = null;
+      this.updateState = null;
+    }
   }
 }

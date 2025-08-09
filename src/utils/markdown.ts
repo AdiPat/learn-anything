@@ -119,7 +119,7 @@ export class MarkdownFormatter {
 
       // 17. Line breaks and spacing
       .replace(/\\\s*\n/g, '\n')
-      .replace(/  \n/g, '\n')
+      .replace(/ {2}\n/g, '\n')
 
       // 18. HTML entities
       .replace(/&lt;/g, '<')
@@ -212,7 +212,7 @@ export class MarkdownFormatter {
         .join('\n');
 
       return '\n' + chalk.cyan('📊 TABLE') + '\n' + styledTable + '\n';
-    } catch (error) {
+    } catch {
       // Fallback to simple formatting
       return `\n${chalk.yellow('📊 TABLE')}:\n${headerRow}\n${bodyRows}\n`;
     }

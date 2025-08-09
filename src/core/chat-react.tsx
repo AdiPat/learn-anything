@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { render } from 'ink';
 import { AIService } from './ai.js';
-import { ReactUIManager } from '@/utils/ui-react.js';
+// Legacy import removed: ReactUIManager is consolidated into UI
 import { ChatInterface } from '@/components/index.js';
 import { ChatMessage } from '@/types/index.js';
 
@@ -11,7 +11,7 @@ export class ReactChatSession {
   private isRunning: boolean = false;
   private appInstance: any = null;
 
-  constructor(aiService: AIService, _ui: ReactUIManager) {
+  constructor(aiService: AIService) {
     this.aiService = aiService;
 
     // Initialize with system message

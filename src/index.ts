@@ -1,8 +1,8 @@
 import { AIService } from '@/core/ai.js';
 import { EnhancedChatSession } from '@/core/enhanced-chat.js';
 import { OutputManager } from '@/core/output.js';
-import { EnhancedUIManager } from '@/utils/enhanced-ui.js';
-import { loadConfig, getApiKey, loadProfile } from '@/utils/config.js';
+import { UI } from '@/utils/ui.js';
+import { loadConfig, getOpenAIApiKey, loadProfile } from '@/utils/config.js';
 import { ProcessedOptions } from '@/types/index.js';
 
 export const VERSION = '1.0.0';
@@ -10,12 +10,12 @@ export const VERSION = '1.0.0';
 export * from '@/types/index.js';
 
 export class LeanCore {
-  private ui: EnhancedUIManager;
+  private ui: UI;
   private aiService: AIService | null = null;
   private outputManager: OutputManager | null = null;
 
   constructor() {
-    this.ui = new EnhancedUIManager();
+    this.ui = new UI();
   }
 
   async initialize(options: ProcessedOptions): Promise<void> {
@@ -35,7 +35,7 @@ export class LeanCore {
       };
 
       // Get API key
-      const apiKey = getApiKey(effectiveConfig, options.env);
+      const apiKey = getOpenAIApiKey(effectiveConfig, options.env);
 
       // Initialize services
       this.aiService = new AIService(effectiveConfig, apiKey);
@@ -160,7 +160,7 @@ export async function executeLeanAction(options: ProcessedOptions): Promise<void
     await lean.initialize(options);
     await lean.executeAction(options);
   } catch (error) {
-    const ui = new EnhancedUIManager();
+    const ui = new UI();
     ui.showError(error instanceof Error ? error.message : 'An unknown error occurred');
     process.exit(1);
   }
