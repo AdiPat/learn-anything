@@ -7,7 +7,7 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "learn": "./dist/cli.js"
+    "lean": "./dist/cli.js"
   },
   "exports": {
     ".": {
@@ -22,7 +22,8 @@
   ],
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "start": "tsx src/cli.ts",
+    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "clean": "rimraf dist",
     "prebuild": "npm run clean",
     "test": "vitest",
@@ -34,7 +35,11 @@
     "typecheck": "tsc --noEmit",
     "validate": "npm run typecheck && npm run lint && npm run format:check && npm run test",
     "prepare": "npm run build",
-    "prepublishOnly": "npm run validate && npm run build"
+    "prepublishOnly": "npm run validate && npm run build",
+    "install:local": "npm install && npm run build:local && npm run link:local",
+    "build:local": "npx tsx --version > /dev/null || npm install -g tsx",
+    "link:local": "chmod +x lean.sh && mkdir -p ~/.local/bin && ln -sf $(pwd)/lean.sh ~/.local/bin/lean && npm run add-to-path",
+    "add-to-path": "node -e \"const fs=require('fs'),os=require('os'),path=require('path'); const shell=process.env.SHELL||''; const rcFile=shell.includes('zsh')?'.zshrc':shell.includes('bash')?'.bashrc':'.profile'; const rcPath=path.join(os.homedir(),rcFile); const pathLine='export PATH=\\\"$HOME/.local/bin:$PATH\\\"'; const content=fs.existsSync(rcPath)?fs.readFileSync(rcPath,'utf8'):''; if(!content.includes(pathLine)){fs.appendFileSync(rcPath,'\\n# Learn Anything CLI\\n'+pathLine+'\\n');} console.log('✅ lean command installed successfully!'); console.log('📝 Please run: source ~/'+rcFile+' (or restart your terminal)'); console.log('🚀 Then try: lean --help');\""
   },
   "keywords": [
     "ai",
@@ -51,12 +56,25 @@
   "dependencies": {
     "@ai-sdk/openai": "^1.0.8",
     "ai": "^4.0.24",
+    "boxen": "^8.0.1",
+    "chalk": "^5.3.0",
     "commander": "^12.1.0",
     "dotenv": "^16.4.7",
+    "gradient-string": "^3.0.0",
+    "ink": "^6.1.0",
+    "ink-box": "^2.0.0",
+    "ink-gradient": "^2.0.0",
+    "ink-link": "^3.0.0",
+    "ink-spinner": "^5.0.0",
+    "ink-text-input": "^6.0.0",
+    "inquirer": "^12.1.0",
+    "ora": "^8.1.1",
+    "react": "^19.1.1",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^20.17.6",
+    "@types/react": "^19.1.9",
     "@typescript-eslint/eslint-plugin": "^8.18.0",
     "@typescript-eslint/parser": "^8.18.0",
     "@vitest/coverage-v8": "^2.1.8",
@@ -65,6 +83,8 @@
     "eslint-plugin-prettier": "^5.2.1",
     "prettier": "^3.4.2",
     "rimraf": "^6.0.1",
+    "tsc-alias": "^1.8.10",
+    "tsup": "^8.3.5",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"

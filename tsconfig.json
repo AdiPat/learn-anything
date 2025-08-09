@@ -6,6 +6,10 @@
     "moduleResolution": "Bundler",
     "lib": ["ES2022"],
 
+    // JSX
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+
     // Output
     "outDir": "./dist",
     "declaration": true,
@@ -40,6 +44,6 @@
     "allowJs": false,
     "incremental": true
   },
-  "include": ["src/**/*", "tests/**/*"],
+  "include": ["src/**/*", "tests/**/*", "src/**/*.tsx"],
   "exclude": ["node_modules", "dist", "coverage"]
 }
