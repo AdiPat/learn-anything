@@ -52,6 +52,15 @@ export class LeanCore {
       throw new Error('LeanCore not initialized');
     }
 
+    if (options.headless && (options.action === 'chat' || options.interactive)) {
+      throw new Error('Cannot run chat or interactive mode in headless mode.');
+    }
+
+    if (options.headless) {
+      await this.executeStandardAction(options);
+      return;
+    }
+
     if (options.action === 'chat') {
       await this.startChatSession();
       return;
@@ -74,7 +83,15 @@ export class LeanCore {
   private async executeStandardAction(options: ProcessedOptions): Promise<void> {
     if (!this.aiService || !this.outputManager) return;
 
-    this.ui.startSpinner('Generating response...');
+    if (options.headless && (options.action === 'chat' || options.interactive)) {
+      throw new Error('Cannot run chat or interactive mode in headless mode.');
+    }
+
+    const enableUI = !options.headless && !options.interactive;
+
+    if (enableUI) {
+      this.ui.startSpinner('Generating response...');
+    }
 
     try {
       const response = await this.aiService.generateResponse(
@@ -83,10 +100,14 @@ export class LeanCore {
         options.creativity !== undefined ? { creativity: options.creativity } : {}
       );
 
-      this.ui.stopSpinner('Response generated!');
+      if (enableUI) {
+        this.ui.stopSpinner('Response generated!');
+      }
 
       // Show the response with enhanced formatting
-      this.ui.showResponse(response, options.action);
+      if (enableUI) {
+        this.ui.showResponse(response, options.action);
+      }
 
       // Save output if requested
       if (options.output) {
@@ -96,16 +117,24 @@ export class LeanCore {
           response,
           options.output
         );
-        this.ui.showSuccess(`Response saved to: ${outputPath}`);
+        if (enableUI) {
+          this.ui.showSuccess(`Response saved to: ${outputPath}`);
+        }
       }
     } catch (error) {
-      this.ui.failSpinner();
+      if (enableUI) {
+        this.ui.failSpinner();
+      }
       throw error;
     }
   }
 
   private async handleInteractiveMode(options: ProcessedOptions): Promise<void> {
     if (!this.aiService || !this.outputManager) return;
+
+    if (options.headless) {
+      throw new Error('Cannot run interactive mode in headless mode.');
+    }
 
     this.ui.startSpinner('Generating response...');
 

@@ -29,6 +29,7 @@ export type ActionType = 'analyze' | 'ask' | 'explain' | 'teach' | 'chat';
 export interface ProcessedOptions extends ActionOptions {
   action: ActionType;
   query: string;
+  headless?: boolean;
 }
 
 export interface ConfigFile {
